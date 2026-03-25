@@ -1,77 +1,47 @@
-import requests
-from bs4 import BeautifulSoup
-import os
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
+import time
 
 def get_amazon_deals():
-    # الرابط المستهدف (أمازون السعودية - قسم العروض)
-    url = "https://www.amazon.sa/-/en/gp/goldbox"
+    print("--- جاري تشغيل المتصفح المتخفي لرصد الصيدات ---")
     
-    # تعريف المتصفح (لكي لا يكتشف أمازون أننا برنامج) - تم تحديثه ليعمل بشكل أفضل
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive"
-    }
+    chrome_options = Options()
+    chrome_options.add_argument("--headless") # تشغيل بدون نافذة (سحابي)
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
-    print("--- جاري البدء في رصد الصيدات من أمازون ---")
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
     
     try:
-        session = requests.Session() # استخدام جلسة مستمرة لزيادة الموثوقية
-        response = session.get(url, headers=headers, timeout=15)
+        # الدخول لأمازون السعودية - قسم العروض
+        driver.get("https://www.amazon.sa/-/en/gp/goldbox")
+        time.sleep(5) # انتظار تحميل الصفحة بالكامل
         
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # محاولة العثور على المنتجات بأكثر من طريقة لأن أمازون يغير تصميمه
-            products = soup.find_all('div', {'data-testid': 'grid-desktop-card'})
-            if not products:
-                 products = soup.find_all('div', {'id': 'grid-main-container'})
-                 if products:
-                     products = products[0].find_all('div', {'class': 'a-section'})
-
-            deals_found = []
-            
-            if products:
-                # سنجلب أول 5 عروض فقط للتجربة لتجنب أي مشاكل في البداية
-                max_deals = 5
-                count = 0
-                
-                for product in products:
-                    if count >= max_deals:
-                        break
-                        
-                    # محاولة استخراج الاسم
-                    name_tag = product.find('div', {'class': 'p13n-sc-truncate'})
-                    if not name_tag:
-                         name_tag = product.find('span', {'class': 'a-size-base'})
-                    
-                    # محاولة استخراج السعر
-                    price_tag = product.find('span', {'class': 'a-price-whole'})
-                    
-                    if name_tag:
-                        name_text = name_tag.text.strip()
-                        price_text = price_tag.text.strip() if price_tag else "غير محدد"
-                        
-                        deals_found.append({
-                            "المنتج": name_text,
-                            "السعر": price_text
-                        })
-                        count += 1
-            
-            if not deals_found:
-                print("تنبيه: لم يتم العثور على منتجات في هذه الجولة. قد يكون الموقع محمي بشكل أقوى حالياً.")
-            else:
-                for idx, deal in enumerate(deals_found, 1):
-                    # إخفاء جزء من الاسم للسرية في التقارير العامة
-                    short_name = (deal['المنتج'][:40] + '..') if len(deal['المنتج']) > 40 else deal['المنتج']
-                    print(f"{idx}. {short_name} - السعر: {deal['السعر']} ريال")
+        print("--- تم دخول الموقع، جاري البحث عن المنتجات ---")
+        
+        # البحث عن كروت المنتجات
+        products = driver.find_elements(By.CSS_SELECTOR, 'div[data-testid="grid-desktop-card"]')
+        
+        if not products:
+            print("تنبيه: أمازون ما زال يخفي العروض. سنحاول مرة أخرى.")
         else:
-            print(f"فشل الوصول للموقع. رمز الخطأ: {response.status_code}")
-            
+            for idx, product in enumerate(products[:5], 1):
+                try:
+                    name = product.find_element(By.CSS_SELECTOR, '.a-size-base').text
+                    price = product.find_element(By.CSS_SELECTOR, '.a-price-whole').text
+                    print(f"{idx}. صيدة: {name[:50]}... | السعر: {price} ريال")
+                except:
+                    continue
+                    
     except Exception as e:
-        print(f"حدث خطأ تقني في الاتصال بأمازون: {e}")
+        print(f"خطأ تقني: {e}")
+    finally:
+        driver.quit()
 
 if __name__ == "__main__":
     get_amazon_deals()
-  
+    
