@@ -1,35 +1,43 @@
-import requests
+import tweepy
 import os
+import requests
 
-def check_secrets():
-    auth = os.getenv("AUTH_TOKEN")
-    ct0 = os.getenv("CT0")
-    
-    print(f"--- فحص الأسرار (المدير التقني) ---")
-    if not auth or not ct0:
-        print("❌ خطأ: لم يتم العثور على AUTH_TOKEN أو CT0 في إعدادات GitHub!")
-        return
-    
-    print(f"طول auth_token المكتشف: {len(auth)} حرف")
-    print(f"طول ct0 المكتشف: {len(ct0)} حرف")
-    
-    url = "https://x.com/i/api/1.1/account/verify_credentials.json"
-    headers = {
-        "Authorization": "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7p9W4tMAb6g7pSdh97sHU9b6vC0vba8abt0pKC",
-        "X-Csrf-Token": ct0,
-        "Cookie": f"auth_token={auth}; ct0={ct0};"
-    }
+# جلب المفاتيح الرسمية من خزنة GitHub
+api_key = os.getenv("TWITTER_API_KEY")
+api_secret = os.getenv("TWITTER_API_SECRET")
+access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+access_secret = os.getenv("TWITTER_ACCESS_SECRET")
+SCRAPER_ANT_KEY = "b23fbb86270742a7b4060d5077b3a76c"
 
+def post_to_x(text):
     try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            print(f"✅ مبروك يا مدير! تم الاتصال بنجاح.")
-            print(f"الحساب المرتبط: {response.json().get('screen_name')}")
-        else:
-            print(f"❌ فشل (خطأ {response.status_code})")
-            print("السبب المحتمل: الكوكيز منتهية أو تم نسخها بشكل خاطئ.")
+        # الاتصال الرسمي بمنصة X عبر API V2
+        client = tweepy.Client(
+            consumer_key=api_key, 
+            consumer_secret=api_secret,
+            access_token=access_token, 
+            access_token_secret=access_secret
+        )
+        response = client.create_tweet(text=text)
+        print(f"✅ تم النشر بنجاح! معرف التغريدة: {response.data['id']}")
     except Exception as e:
-        print(f"⚠️ خطأ تقني: {e}")
+        print(f"❌ فشل النشر الرسمي: {e}")
+
+def get_deal_and_post():
+    target_url = "https://www.amazon.sa/-/en/gp/goldbox"
+    proxy_url = f"https://api.scrapingant.com/v2/general?url={target_url}&x-api-key={SCRAPER_ANT_KEY}&browser=false"
+
+    print("--- جاري فحص صيدات أمازون الجديدة ---")
+    try:
+        response = requests.get(proxy_url, timeout=30)
+        if response.status_code == 200:
+            # نص التغريدة الافتتاحي للمشروع
+            tweet_content = "🚨 عروض أمازون السعودية جارية الآن! 🇸🇦\n\nصيدات قوية وخصومات خرافية على قسم العروض اليومية.. لا تفوتكم قبل نفاد الكمية! ⚡️\n\nتفقد العروض من هنا 👇\nhttps://www.amazon.sa/-/en/gp/goldbox \n\n#أمازون #عروض #صيدات #السعودية"
+            post_to_x(tweet_content)
+        else:
+            print("فشل في الوصول لموقع أمازون حالياً.")
+    except Exception as e:
+        print(f"حدث خطأ في الرصد: {e}")
 
 if __name__ == "__main__":
-    check_secrets()
+    get_deal_and_post()
