@@ -1,39 +1,41 @@
 import requests
 import os
 
-# نستخدم الأسرار التي وضعناها سابقاً (تأكد أن قيمها صحيحة من المتصفح)
-AUTH_TOKEN = os.getenv("AUTH_TOKEN")
-CT0 = os.getenv("CT0")
+# جلب المفتاح الرسمي من خزنة GitHub
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-def post_tweet_free(text):
-    url = "https://x.com/i/api/graphql/nS_S2vX_0eS68F9S8F9S8F/CreateTweet" # رابط النشر المباشر
+# رابط قناتك العامة (المعرف الرسمي)
+TELEGRAM_CHAT_ID = "@amazonturky" 
+
+def send_to_telegram(text):
+    # رابط API التلجرام للإرسال
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     
-    headers = {
-        "Authorization": "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7p9W4tMAb6g7pSdh97sHU9b6vC0vba8abt0pKC",
-        "X-Csrf-Token": CT0,
-        "Cookie": f"auth_token={AUTH_TOKEN}; ct0={CT0};",
-        "Content-Type": "application/json"
-    }
-
-    # بيانات التغريدة بتنسيق X الحديث
     payload = {
-        "variables": {
-            "tweet_text": text,
-            "reply": {"exclude_reply_user_ids": []},
-            "media": {"media_entities": [], "possibly_sensitive": False}
-        },
-        "queryId": "nS_S2vX_0eS68F9S8F9S8F"
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML", # لاستخدام التنسيقات مثل العريض والروابط
+        "disable_web_page_preview": False # لإظهار معاينة لرابط أمازون
     }
-
+    
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, json=payload)
         if response.status_code == 200:
-            print("✅ تم النشر مجاناً وبنجاح يا مدير!")
+            print("✅ مبروك يا أبو علي! أول صيدة وصلت للقناة بنجاح.")
         else:
-            print(f"❌ فشل النشر. رمز الخطأ: {response.status_code}")
-            print("ملاحظة: تأكد من نسخ AUTH_TOKEN و CT0 من المتصفح الخفي (Incognito).")
+            print(f"❌ فشل الإرسال. رمز الخطأ: {response.status_code}")
+            print(f"السبب: {response.text}")
+            print("تنبيه: تأكد أن البوت مضاف كـ Admin في قناة @amazonturky")
     except Exception as e:
         print(f"⚠️ خطأ تقني: {e}")
 
 if __name__ == "__main__":
-    post_tweet_free("🚀 تجربة النشر المجاني عبر النظام المطور.. صيدات أمازون قادمة!")
+    # نص الرسالة الاحترافي الذي سيظهر للمشتركين في قناتك
+    message = (
+        "<b>📢 صيدات أمازون السعودية وصلت! 🇸🇦</b>\n\n"
+        "بدأت الآن أقوى العروض اليومية بخصومات كبرى.. 🔥\n\n"
+        "🔗 <b>تصفح العروض واقتنص الفرصة قبل النفاذ:</b>\n"
+        "https://www.amazon.sa/-/en/gp/goldbox\n\n"
+        "<i>اشترك في القناة لتوصلك التنبيهات فوراً! ⚡️</i>"
+    )
+    send_to_telegram(message)
