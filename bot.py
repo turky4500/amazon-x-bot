@@ -1,43 +1,39 @@
-import tweepy
-import os
 import requests
+import os
 
-# جلب المفاتيح الرسمية من خزنة GitHub
-api_key = os.getenv("TWITTER_API_KEY")
-api_secret = os.getenv("TWITTER_API_SECRET")
-access_token = os.getenv("TWITTER_ACCESS_TOKEN")
-access_secret = os.getenv("TWITTER_ACCESS_SECRET")
-SCRAPER_ANT_KEY = "b23fbb86270742a7b4060d5077b3a76c"
+# نستخدم الأسرار التي وضعناها سابقاً (تأكد أن قيمها صحيحة من المتصفح)
+AUTH_TOKEN = os.getenv("AUTH_TOKEN")
+CT0 = os.getenv("CT0")
 
-def post_to_x(text):
+def post_tweet_free(text):
+    url = "https://x.com/i/api/graphql/nS_S2vX_0eS68F9S8F9S8F/CreateTweet" # رابط النشر المباشر
+    
+    headers = {
+        "Authorization": "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7p9W4tMAb6g7pSdh97sHU9b6vC0vba8abt0pKC",
+        "X-Csrf-Token": CT0,
+        "Cookie": f"auth_token={AUTH_TOKEN}; ct0={CT0};",
+        "Content-Type": "application/json"
+    }
+
+    # بيانات التغريدة بتنسيق X الحديث
+    payload = {
+        "variables": {
+            "tweet_text": text,
+            "reply": {"exclude_reply_user_ids": []},
+            "media": {"media_entities": [], "possibly_sensitive": False}
+        },
+        "queryId": "nS_S2vX_0eS68F9S8F9S8F"
+    }
+
     try:
-        # الاتصال الرسمي بمنصة X عبر API V2
-        client = tweepy.Client(
-            consumer_key=api_key, 
-            consumer_secret=api_secret,
-            access_token=access_token, 
-            access_token_secret=access_secret
-        )
-        response = client.create_tweet(text=text)
-        print(f"✅ تم النشر بنجاح! معرف التغريدة: {response.data['id']}")
-    except Exception as e:
-        print(f"❌ فشل النشر الرسمي: {e}")
-
-def get_deal_and_post():
-    target_url = "https://www.amazon.sa/-/en/gp/goldbox"
-    proxy_url = f"https://api.scrapingant.com/v2/general?url={target_url}&x-api-key={SCRAPER_ANT_KEY}&browser=false"
-
-    print("--- جاري فحص صيدات أمازون الجديدة ---")
-    try:
-        response = requests.get(proxy_url, timeout=30)
+        response = requests.post(url, headers=headers, json=payload)
         if response.status_code == 200:
-            # نص التغريدة الافتتاحي للمشروع
-            tweet_content = "🚨 عروض أمازون السعودية جارية الآن! 🇸🇦\n\nصيدات قوية وخصومات خرافية على قسم العروض اليومية.. لا تفوتكم قبل نفاد الكمية! ⚡️\n\nتفقد العروض من هنا 👇\nhttps://www.amazon.sa/-/en/gp/goldbox \n\n#أمازون #عروض #صيدات #السعودية"
-            post_to_x(tweet_content)
+            print("✅ تم النشر مجاناً وبنجاح يا مدير!")
         else:
-            print("فشل في الوصول لموقع أمازون حالياً.")
+            print(f"❌ فشل النشر. رمز الخطأ: {response.status_code}")
+            print("ملاحظة: تأكد من نسخ AUTH_TOKEN و CT0 من المتصفح الخفي (Incognito).")
     except Exception as e:
-        print(f"حدث خطأ في الرصد: {e}")
+        print(f"⚠️ خطأ تقني: {e}")
 
 if __name__ == "__main__":
-    get_deal_and_post()
+    post_tweet_free("🚀 تجربة النشر المجاني عبر النظام المطور.. صيدات أمازون قادمة!")
