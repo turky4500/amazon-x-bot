@@ -8,56 +8,50 @@ TELEGRAM_CHAT_ID = "@amazonturky"
 ASSOCIATE_TAG = "tkwin-21"
 
 def post_to_telegram():
-    # هنا نضع "مخزن الصيدات" - يمكنك إضافة أي رابط منتج أعجبك هنا مستقبلاً
-    # البوت سيختار واحد منها عشوائياً في كل مرة ليرسله بصورته
+    # مخزن الصيدات المختارة
     deals = [
         {
-            "title": "سماعة آبل إيربودز برو (الجيل الثاني) مع علبة شحن MagSafe",
-            "img": "https://m.media-amazon.com/images/I/61f1Yf71HeL._AC_SL1500_.jpg",
+            "title": "🔥 سماعة آبل إيربودز برو (الجيل الثاني) الأصلية",
             "link": "https://www.amazon.sa/dp/B0BDHWDR12"
         },
         {
-            "title": "قلاية فيليبس الهوائية سعة 4.1 لتر - تقنية Rapid Air",
-            "img": "https://m.media-amazon.com/images/I/61S9df6yS8L._AC_SL1500_.jpg",
+            "title": "🚀 قلاية فيليبس الهوائية سعة 4.1 لتر - الأكثر مبيعاً",
             "link": "https://www.amazon.sa/dp/B08XWWPNC6"
         },
         {
-            "title": "ماكينة حلاقة فيليبس مالتي جروم سلسلة 7000 (14 في 1)",
-            "img": "https://m.media-amazon.com/images/I/81S7H8O0K5L._AC_SL1500_.jpg",
+            "title": "⚡️ ماكينة حلاقة فيليبس مالتي جروم (14 في 1)",
             "link": "https://www.amazon.sa/dp/B071RZMB4B"
         }
     ]
     
     # اختيار صيدة عشوائية
     deal = random.choice(deals)
-    
-    # إضافة كود الأرباح للرابط
     final_link = f"{deal['link']}?tag={ASSOCIATE_TAG}"
     
-    # نص الرسالة (بدون تفاصيل مملة)
-    caption = (
-        f"<b>🔥 {deal['title']}</b>\n\n"
-        f"🔗 <b>رابط الصيدة:</b>\n{final_link}\n\n"
+    # نص الرسالة المختصر والمباشر
+    message_text = (
+        f"<b>{deal['title']}</b>\n\n"
+        f"🔗 <b>رابط الصيدة مباشرة:</b>\n{final_link}\n\n"
         f"✅ <b>تم الرصد بواسطة بوت صيدات تركي</b>"
     )
     
-    # رابط الإرسال للتلجرام (صورة + نص)
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+    # استخدام sendMessage بدلاً من sendPhoto لتجنب أخطاء الروابط
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
-        "photo": deal['img'],
-        "caption": caption,
-        "parse_mode": "HTML"
+        "text": message_text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": False  # هذا السطر سيجعل التلجرام يجلب صورة المنتج تلقائياً
     }
     
     try:
         response = requests.post(url, json=payload)
         if response.status_code == 200:
-            print(f"✅ تم إرسال الصيدة بنجاح: {deal['title'][:20]}")
+            print(f"✅ تم بنجاح! تفقد القناة الآن.")
         else:
-            print(f"❌ فشل الإرسال. السبب: {response.text}")
+            print(f"❌ فشل: {response.text}")
     except Exception as e:
-        print(f"⚠️ خطأ تقني: {e}")
+        print(f"⚠️ خطأ: {e}")
 
 if __name__ == "__main__":
     post_to_telegram()
