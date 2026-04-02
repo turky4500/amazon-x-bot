@@ -2,30 +2,22 @@ name: Amazon Deals Bot Crawler
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: [ main ]
+  workflow_dispatch: # للتشغيل اليدوي
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
+      - uses: actions/checkout@v3
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-
       - name: Install dependencies
-        run: |
-          pip install requests
-
-      - name: Run Amazon Bot
+        run: pip install requests
+      - name: Run Bot
         env:
-          # نربط الأسماء الجديدة هنا لكي يراها الكود
-          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
-          CT0: ${{ secrets.CT0 }}
+          # هذا السطر هو الأهم، بدونه يظهر خطأ 404
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: python bot.py
