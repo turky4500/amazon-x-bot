@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # يسمح لك بتشغيل البوت يدوياً بضغطة زر
+  workflow_dispatch:
 
 jobs:
   build:
@@ -21,14 +21,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install requests
 
       - name: Run Amazon Bot
         env:
-          # ربط مفاتيح API الرسمية بالبيئة (تأكد من وجودها في Secrets)
-          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
-          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
-          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
-          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+          # نربط الأسماء الجديدة هنا لكي يراها الكود
+          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          CT0: ${{ secrets.CT0 }}
         run: python bot.py
