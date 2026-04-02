@@ -1,42 +1,78 @@
 import requests
+from bs4 import BeautifulSoup
 import os
 import random
 
-# الإعدادات
+# الإعدادات الأساسية
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = "@amazonturky"
 ASSOCIATE_TAG = "tkwin-21"
 
-def post_to_telegram():
-    # رابط العروض العام مع كود الأرباح الخاص بك
-    affiliate_url = f"https://www.amazon.sa/-/en/gp/goldbox?tag={ASSOCIATE_TAG}"
-    
-    # نصوص تسويقية جذابة ومختصرة لضمان الوصول
-    messages = [
-        f"<b>🚀 صيدات الساعة من أمازون وصلت! 🇸🇦</b>\n\nلقينا لك خصومات خرافية في قسم العروض اليومية.. 🔥\n\n🛍️ <b>تصفح العروض واقتنص الفرصة:</b>\n{affiliate_url}\n\n<i>⚡️ الحق قبل نفاذ الكمية!</i>",
-        f"<b>🚨 عروض أمازون السعودية ولعت! 🔥</b>\n\nصيدات قوية بانتظارك الآن بأسعار مجنونة.. 👇\n\n🛍️ <b>تصفح كافة العروض من هنا:</b>\n{affiliate_url}\n\n<i>💸 وفر قروشك واشتر بذكاء!</i>",
-        f"<b>🔥 جديد صيدات تركي! لا تفوتها.. 🚀</b>\n\nأقوى خصومات اليوم في أمازون صارت جاهزة.. 😍\n\n🛍️ <b>للتصفح والشراء المباشر:</b>\n{affiliate_url}\n\n<i>✅ تم الرصد بواسطة بوت صيدات تركي</i>"
-    ]
-    
-    selected_message = random.choice(messages)
-    
-    # رابط الإرسال (نص فقط لضمان النجاح 100%)
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": selected_message,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": False # لإظهار معاينة بسيطة للرابط
+def get_real_deal():
+    # رابط العروض المباشرة
+    url = "https://www.amazon.sa/-/en/gp/goldbox"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
     }
     
     try:
-        response = requests.post(url, json=payload)
-        if response.status_code == 200:
-            print("✅ تم الإرسال بنجاح! تفقد القناة الآن.")
-        else:
-            print(f"❌ فشل الإرسال. السبب: {response.text}")
-    except Exception as e:
-        print(f"⚠️ خطأ تقني: {e}")
+        response = requests.get(url, headers=headers, timeout=20)
+        soup = BeautifulSoup(response.content, "html.parser")
+        
+        # البحث عن كروت المنتجات
+        items = soup.find_all('div', {'data-testid': 'grid-desktop-card'})
+        if not items:
+            items = soup.select('.octopus-pc-item-content')
+
+        if items:
+            item = random.choice(items)
+            
+            # 1. جلب العنوان
+            title_tag = item.find(['h2', 'span'], class_=True)
+            title = title_tag.get_text().strip() if title_tag else "عرض خاص من أمازون"
+            
+            # 2. جلب الصورة
+            img_tag = item.find('img')
+            img_url = img_tag['src'] if img_tag else ""
+            
+            # 3. جلب الرابط وإضافة كودك tkwin-21
+            link_tag = item.find('a', href=True)
+            raw_link = link_tag['href']
+            if not raw_link.startswith('http'):
+                raw_link = "https://www.amazon.sa" + raw_link
+            final_link = raw_link.split('?')[0] + f"?tag={ASSOCIATE_TAG}"
+            
+            return title, img_url, final_link
+    except:
+        pass
+    return None, None, None
+
+def post_to_telegram():
+    title, img, link = get_real_deal()
+    
+    if title and img and link:
+        # نص الرسالة: اسم المنتج + الرابط (بدون فلسفة زايدة)
+        caption = (
+            f"<b>{title}</b>\n\n"
+            f"🔗 <b>رابط العرض:</b>\n{link}\n\n"
+            f"✅ <b>تم الرصد بواسطة بوت صيدات تركي</b>"
+        )
+        
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "photo": img,
+            "caption": caption,
+            "parse_mode": "HTML"
+        }
+        
+        res = requests.post(url, json=payload)
+        if res.status_code == 200:
+            print("✅ تم إرسال الصيدة بنجاح!")
+            return
+
+    print("❌ فشل في جلب منتج محدد.")
 
 if __name__ == "__main__":
     post_to_telegram()
