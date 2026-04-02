@@ -2,29 +2,30 @@ name: Amazon Deals Bot Crawler
 
 on:
   push:
-    branches: [ "main" ] # يعمل عند إضافة أي كود جديد
-  schedule:
-    - cron: '0 * * * *' # يعمل تلقائياً كل ساعة (صفر تكلفة)
-  workflow_dispatch: # يتيح لك تشغيله يدوياً للمراقبة
+    branches:
+      - main
+  workflow_dispatch: # هذا الزر يسمح لك بتشغيل البوت يدوياً في أي وقت
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          pip install requests
 
-    - name: Run Amazon Bot
-      run: python bot.py
-      
+      - name: Run Amazon Bot
+        env:
+          # ربط مفاتيح الخزنة ببيئة تشغيل الكود (مهم جداً)
+          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          CT0: ${{ secrets.CT0 }}
+        run: python bot.py
