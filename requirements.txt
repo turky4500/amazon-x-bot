@@ -1,5 +1,3 @@
-tweepy
 requests
 beautifulsoup4
 lxml
-pyshorteners
