@@ -39,62 +39,83 @@ def get_last_deal():
     except:
         return None
 
+def extract_products_from_soup(soup):
+    """محاولة استخراج المنتجات بعدة طرق من الصفحة"""
+    products = []
+    # الطريقة 1: البحث عن روابط تحتوي على /dp/ داخل بطاقات المنتجات
+    for a in soup.find_all("a", href=True):
+        href = a['href']
+        if '/dp/' in href:
+            # تأكد من أن الرابط كامل
+            if not href.startswith('http'):
+                href = "https://www.amazon.sa" + href.split('?')[0]
+            if re.search(r'/dp/([A-Z0-9]{10})', href):
+                title_elem = a.find('span', class_=re.compile('title')) or a.find('h2') or a.find('span')
+                title = title_elem.get_text(strip=True) if title_elem else 'منتج مميز'
+                if len(title) > 5 and href not in [p['link'] for p in products]:
+                    products.append({"title": title, "link": href})
+                    if len(products) >= 10:
+                        break
+    return products
+
 def fetch_todays_deals():
-    """جلب العروض من صفحة Today's Deals (عروض اليوم)"""
+    """محاولة جلب عروض اليوم باستخدام طرق مرنة"""
     url = "https://www.amazon.sa/deals"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     try:
-        print("🔄 جاري جلب عروض اليوم من أمازون...")
+        print("🔄 جاري جلب عروض اليوم...")
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"❌ فشل الاتصال بصفحة العروض: {e}")
+        return []
+    
+    soup = BeautifulSoup(response.text, "lxml")
+    products = extract_products_from_soup(soup)
+    
+    if products:
+        print(f"✅ تم استخراج {len(products)} عرضاً من عروض اليوم")
+    else:
+        print("⚠️ لم يتم العثور على عروض في صفحة اليوم، سيتم استخدام الأكثر مبيعاً كبديل.")
+        # جلب من الأكثر مبيعاً
+        products = fetch_bestsellers()
+    return products
+
+def fetch_bestsellers():
+    """جلب المنتجات من صفحة الأكثر مبيعاً (بديل)"""
+    url = "https://www.amazon.sa/gp/bestsellers"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    try:
+        print("🔄 جاري جلب الأكثر مبيعاً...")
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
     except Exception as e:
         print(f"❌ فشل الاتصال: {e}")
         return []
-    
     soup = BeautifulSoup(response.text, "lxml")
     products = []
-    
-    # البحث عن بطاقات العروض (قد يتغير selector لكن هذه الأحدث)
-    cards = soup.select("div[data-testid='product-card']")
-    if not cards:
-        # محاولة بديلة
-        cards = soup.select("div.a-section[data-component-type='s-search-result']")
-    
-    for card in cards[:20]:  # نأخذ أول 20 عرضاً
-        # استخراج الرابط
-        link_elem = card.find("a", href=True)
-        if not link_elem:
-            continue
-        link = link_elem["href"]
-        if not link.startswith("http"):
-            link = "https://www.amazon.sa" + link.split('?')[0]
-        
-        # التأكد من صحة الرابط (يحتوي على /dp/)
-        if not re.search(r'/dp/([A-Z0-9]{10})', link):
-            continue
-        
-        # استخراج العنوان
-        title_elem = card.find("span", {"class": "a-truncate-full"}) or card.find("h2") or card.find("span", {"class": "a-size-base-plus"})
-        title = title_elem.get_text(strip=True) if title_elem else "منتج مميز"
-        
-        # تنظيف العنوان من المسافات الزائدة
-        title = ' '.join(title.split())
-        
-        products.append({"title": title, "link": link})
+    for item in soup.select("div.p13n-sc-truncate-desktop-type2"):
+        title = item.get_text(strip=True)
+        parent = item.find_parent("a")
+        if parent and parent.get("href"):
+            link = parent["href"]
+            if not link.startswith("http"):
+                link = "https://www.amazon.sa" + link.split('?')[0]
+            if re.search(r'/dp/([A-Z0-9]{10})', link):
+                products.append({"title": title, "link": link})
         if len(products) >= 10:
             break
-    
-    print(f"✅ تم استخراج {len(products)} عرضاً من عروض اليوم")
+    print(f"✅ تم استخراج {len(products)} منتجاً من الأكثر مبيعاً")
     return products
 
 def post_to_telegram():
-    print("🔄 بدء تشغيل بوت عروض اليوم...")
+    print("🔄 بدء تشغيل البوت...")
     deals = fetch_todays_deals()
     
     if not deals:
-        print("❌ لا توجد عروض اليوم. لن يتم إرسال أي شيء.")
+        print("❌ لا توجد عروض متاحة على الإطلاق. لن يتم الإرسال.")
         return
     
     last_deal = get_last_deal()
@@ -102,8 +123,10 @@ def post_to_telegram():
         deals = [d for d in deals if d["link"] != last_deal["link"]]
     
     if not deals:
-        print("⚠️ جميع العروض مكررة، سيتم إرسال أول عرض.")
-        deals = fetch_todays_deals()[:1]
+        print("⚠️ جميع العروض مكررة، سيتم إرسال أول عرض متاح.")
+        deals = fetch_todays_deals()[:1] if fetch_todays_deals() else fetch_bestsellers()[:1]
+        if not deals:
+            return
     
     deal = random.choice(deals)
     final_link = f"{deal['link']}?tag={ASSOCIATE_TAG}"
@@ -122,7 +145,7 @@ def post_to_telegram():
     try:
         r = requests.post(url, json=payload, timeout=10)
         if r.status_code == 200:
-            print("✅ تم إرسال عرض اليوم بنجاح!")
+            print("✅ تم الإرسال بنجاح!")
             save_last_deal(deal)
         else:
             print(f"❌ فشل الإرسال: {r.text}")
