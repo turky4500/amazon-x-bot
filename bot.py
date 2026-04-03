@@ -91,7 +91,7 @@ def select_unique_deal(deals, last_deal):
     if last_deal is None:
         return random.choice(deals)
     
-    # تصفية المنتجات التي لا تساوي آخر منتج (نقارن بالرابط أو العنوان)
+    # تصفية المنتجات التي لا تساوي آخر منتج (نقارن بالرابط)
     unique_deals = [d for d in deals if d["link"] != last_deal.get("link")]
     
     if not unique_deals:
