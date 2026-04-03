@@ -3,16 +3,27 @@ import os
 import random
 import json
 from bs4 import BeautifulSoup
+import pyshorteners
 
 # ========== الإعدادات الأساسية ==========
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = "@amazonturky"   # يمكنك تغيير معرف القناة لاحقاً
+TELEGRAM_CHAT_ID = "@amazonturky"
 ASSOCIATE_TAG = "tkwin-21"
-LAST_DEAL_FILE = "last_deal.json"   # ملف حفظ آخر منتج تم إرساله
+LAST_DEAL_FILE = "last_deal.json"
+
+# ========== دالة تقصير الرابط ==========
+def shorten_url(long_url):
+    try:
+        s = pyshorteners.Shortener()
+        short_url = s.tinyurl.short(long_url)
+        print(f"🔗 تم تقصير الرابط بنجاح: {short_url}")
+        return short_url
+    except Exception as e:
+        print(f"⚠️ فشل تقصير الرابط، سيتم إرسال الرابط الطويل: {e}")
+        return long_url
 
 # ========== دالة حفظ آخر منتج تم إرساله ==========
 def save_last_deal(deal):
-    """حفظ بيانات المنتج الأخير في ملف JSON"""
     try:
         with open(LAST_DEAL_FILE, "w", encoding="utf-8") as f:
             json.dump(deal, f, ensure_ascii=False, indent=2)
@@ -22,7 +33,6 @@ def save_last_deal(deal):
 
 # ========== دالة قراءة آخر منتج تم إرساله ==========
 def get_last_deal():
-    """إرجاع آخر منتج تم إرساله، أو None إذا لم يكن موجوداً"""
     try:
         with open(LAST_DEAL_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -35,10 +45,6 @@ def get_last_deal():
 
 # ========== دالة جلب العروض الحقيقية من أمازون ==========
 def fetch_amazon_deals():
-    """
-    تجلب منتجات من صفحة "أفضل مبيعاً" في أمازون السعودية.
-    تعيد قائمة من القواميس، كل قاموس يحتوي على title و link.
-    """
     url = "https://www.amazon.sa/gp/bestsellers"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -52,8 +58,6 @@ def fetch_amazon_deals():
         return []
     
     soup = BeautifulSoup(response.text, "lxml")
-    
-    # البحث عن عناوين المنتجات (قد يتغير selector مع الوقت)
     product_items = soup.select("div.p13n-sc-truncate-desktop-type2")
     
     if not product_items:
@@ -61,7 +65,7 @@ def fetch_amazon_deals():
         return []
     
     deals = []
-    for item in product_items[:10]:  # أول 10 منتجات
+    for item in product_items[:10]:
         title = item.get_text(strip=True)
         parent_link = item.find_parent("a")
         if parent_link and parent_link.get("href"):
@@ -80,23 +84,17 @@ def fetch_amazon_deals():
 
 # ========== دالة اختيار منتج مختلف عن آخر منتج تم إرساله ==========
 def select_unique_deal(deals, last_deal):
-    """
-    تختار منتجاً عشوائياً من القائمة بحيث لا يكون مطابقاً للمنتج الأخير (إذا كان موجوداً).
-    إذا لم تجد منتجاً مختلفاً، تعيد None.
-    """
     if not deals:
         return None
     
-    # إذا لم يكن هناك آخر منتج، اختر أي منتج
     if last_deal is None:
         return random.choice(deals)
     
-    # تصفية المنتجات التي لا تساوي آخر منتج (نقارن بالرابط)
     unique_deals = [d for d in deals if d["link"] != last_deal.get("link")]
     
     if not unique_deals:
         print("⚠️ جميع المنتجات الحالية مكررة لآخر منتج. سيتم إرسال المنتج الأول مع تجاهل التكرار.")
-        return deals[0]  # بديل آمن
+        return deals[0]
     
     return random.choice(unique_deals)
 
@@ -113,10 +111,7 @@ def post_to_telegram():
             {"title": "⚡️ ماكينة حلاقة فيليبس مالتي جروم سلسلة 7000", "link": "https://www.amazon.sa/dp/B071RZMB4B"},
         ]
     
-    # قراءة آخر منتج تم إرساله
     last_deal = get_last_deal()
-    
-    # اختيار منتج جديد مختلف
     deal = select_unique_deal(deals, last_deal)
     if deal is None:
         print("❌ لا يمكن اختيار منتج. الخروج.")
@@ -125,10 +120,12 @@ def post_to_telegram():
     # إضافة كود الأرباح
     final_link = f"{deal['link']}?tag={ASSOCIATE_TAG}"
     
-    # نص الرسالة (تم حذف جملة "تم الرصد بواسطة بوت تركي")
+    # تقصير الرابط
+    short_link = shorten_url(final_link)
+    
     message_text = (
         f"<b>{deal['title']}</b>\n\n"
-        f"🔗 <b>رابط الشراء المباشر:</b>\n{final_link}"
+        f"🔗 <b>رابط الشراء المباشر:</b>\n{short_link}"
     )
     
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -142,8 +139,7 @@ def post_to_telegram():
     try:
         response = requests.post(url, json=payload)
         if response.status_code == 200:
-            print("✅ تم الإرسال بنجاح!")
-            # بعد الإرسال الناجح، نقوم بحفظ هذا المنتج كآخر منتج
+            print("✅ تم الإرسال بنجاح مع رابط مختصر!")
             save_last_deal(deal)
         else:
             print(f"❌ فشل الإرسال: {response.text}")
