@@ -16,7 +16,13 @@ MARKETING_PHRASES = [
     "🎁 شامل ضمان لمدة سنتين",
     "🚀 الشحن المجاني اليوم فقط",
     "💎 الأكثر مبيعاً في أمازون",
-    "🏆 أفضل سعر خلال 30 يوماً"
+    "🏆 أفضل سعر خلال 30 يوماً",
+    "✨ إدخال رائع للمنزل",
+    "💥 كمية محدودة - لا تفوتك",
+    "📦 وصول سريع خلال 24 ساعة",
+    "🛒 أضف إلى السلة الآن",
+    "⭐ تقييم 4.5 نجوم فما فوق",
+    "🎯 صفقة اليوم الحصرية"
 ]
 
 def add_marketing_phrase(title):
@@ -33,59 +39,95 @@ def get_last_deal():
     except:
         return None
 
-def fetch_deals():
-    url = "https://www.amazon.sa/gp/bestsellers"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+def fetch_todays_deals():
+    """جلب العروض من صفحة Today's Deals (عروض اليوم)"""
+    url = "https://www.amazon.sa/deals"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
     try:
-        r = requests.get(url, headers=headers, timeout=15)
-        r.raise_for_status()
-    except:
+        print("🔄 جاري جلب عروض اليوم من أمازون...")
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"❌ فشل الاتصال: {e}")
         return []
-    soup = BeautifulSoup(r.text, "lxml")
+    
+    soup = BeautifulSoup(response.text, "lxml")
     products = []
-    for item in soup.select("div.p13n-sc-truncate-desktop-type2"):
-        title = item.get_text(strip=True)
-        parent = item.find_parent("a")
-        if parent and parent.get("href"):
-            link = parent["href"]
-            if not link.startswith("http"):
-                link = "https://www.amazon.sa" + link.split('?')[0]
-            if re.search(r'/dp/([A-Z0-9]{10})', link):
-                products.append({"title": title, "link": link})
+    
+    # البحث عن بطاقات العروض (قد يتغير selector لكن هذه الأحدث)
+    cards = soup.select("div[data-testid='product-card']")
+    if not cards:
+        # محاولة بديلة
+        cards = soup.select("div.a-section[data-component-type='s-search-result']")
+    
+    for card in cards[:20]:  # نأخذ أول 20 عرضاً
+        # استخراج الرابط
+        link_elem = card.find("a", href=True)
+        if not link_elem:
+            continue
+        link = link_elem["href"]
+        if not link.startswith("http"):
+            link = "https://www.amazon.sa" + link.split('?')[0]
+        
+        # التأكد من صحة الرابط (يحتوي على /dp/)
+        if not re.search(r'/dp/([A-Z0-9]{10})', link):
+            continue
+        
+        # استخراج العنوان
+        title_elem = card.find("span", {"class": "a-truncate-full"}) or card.find("h2") or card.find("span", {"class": "a-size-base-plus"})
+        title = title_elem.get_text(strip=True) if title_elem else "منتج مميز"
+        
+        # تنظيف العنوان من المسافات الزائدة
+        title = ' '.join(title.split())
+        
+        products.append({"title": title, "link": link})
         if len(products) >= 10:
             break
+    
+    print(f"✅ تم استخراج {len(products)} عرضاً من عروض اليوم")
     return products
 
 def post_to_telegram():
-    deals = fetch_deals()
+    print("🔄 بدء تشغيل بوت عروض اليوم...")
+    deals = fetch_todays_deals()
+    
     if not deals:
-        print("لا توجد عروض")
+        print("❌ لا توجد عروض اليوم. لن يتم إرسال أي شيء.")
         return
-    last = get_last_deal()
-    if last:
-        deals = [d for d in deals if d["link"] != last["link"]]
+    
+    last_deal = get_last_deal()
+    if last_deal:
+        deals = [d for d in deals if d["link"] != last_deal["link"]]
+    
     if not deals:
-        deals = fetch_deals()[:1]
+        print("⚠️ جميع العروض مكررة، سيتم إرسال أول عرض.")
+        deals = fetch_todays_deals()[:1]
+    
     deal = random.choice(deals)
     final_link = f"{deal['link']}?tag={ASSOCIATE_TAG}"
-    title = add_marketing_phrase(deal['title'])
-    msg = f"<b>{title}</b>\n\n🔗 {final_link}"
+    title_with_phrase = add_marketing_phrase(deal['title'])
+    
+    message = f"<b>{title_with_phrase}</b>\n\n🔗 <b>رابط الشراء المباشر:</b>\n{final_link}"
+    
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
-        "text": msg,
+        "text": message,
         "parse_mode": "HTML",
         "disable_web_page_preview": False
     }
+    
     try:
         r = requests.post(url, json=payload, timeout=10)
         if r.status_code == 200:
+            print("✅ تم إرسال عرض اليوم بنجاح!")
             save_last_deal(deal)
-            print("تم الإرسال بنجاح")
         else:
-            print("فشل الإرسال", r.text)
+            print(f"❌ فشل الإرسال: {r.text}")
     except Exception as e:
-        print("خطأ", e)
+        print(f"⚠️ خطأ في الإرسال: {e}")
 
 if __name__ == "__main__":
     post_to_telegram()
