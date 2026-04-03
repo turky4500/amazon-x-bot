@@ -52,7 +52,7 @@ MARKETING_PHRASES = [
     "🎁 عرض خاص بمناسبة التخفيضات"
 ]
 
-# ========== دوال مساعدة (بدون تغيير) ==========
+# ========== دوال مساعدة ==========
 def add_marketing_phrase(title):
     phrase = random.choice(MARKETING_PHRASES)
     return f"{phrase}\n\n{title}"
@@ -77,7 +77,6 @@ def is_valid_amazon_link(link):
 
 # ========== مصادر جلب العروض ==========
 def fetch_bestsellers():
-    """المصدر 1: الأكثر مبيعاً (Bestsellers)"""
     url = "https://www.amazon.sa/gp/bestsellers"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
@@ -104,7 +103,6 @@ def fetch_bestsellers():
     return products
 
 def fetch_todays_deals():
-    """المصدر 2: عروض اليوم (Today's Deals)"""
     url = "https://www.amazon.sa/deals"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
@@ -116,7 +114,6 @@ def fetch_todays_deals():
         return []
     soup = BeautifulSoup(response.text, "lxml")
     products = []
-    # البحث عن بطاقات المنتجات
     for item in soup.select("div[data-testid='product-card']"):
         link_elem = item.find("a", href=True)
         if link_elem:
@@ -133,7 +130,6 @@ def fetch_todays_deals():
     return products
 
 def fetch_prime_deals():
-    """المصدر 3: عروض البرايم الحصرية (Prime Exclusive Deals)"""
     url = "https://www.amazon.sa/prime/deals"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
@@ -160,7 +156,6 @@ def fetch_prime_deals():
     print(f"✅ تم استخراج {len(products)} منتجاً من عروض البرايم.")
     return products
 
-# ========== اختيار مصدر العروض بناءً على المتغير ==========
 def fetch_deals():
     source = SOURCE.lower()
     if source == "bestsellers":
