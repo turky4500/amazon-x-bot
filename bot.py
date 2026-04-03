@@ -6,11 +6,11 @@ from bs4 import BeautifulSoup
 
 # ========== الإعدادات الأساسية ==========
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = "@amazonturky"
-ASSOCIATE_TAG = "tkwin-21"
-LAST_DEAL_FILE = "last_deal.json"
+TELEGRAM_CHAT_ID = "@amazonturky"  # ضع معرف قناتك هنا
+ASSOCIATE_TAG = "tkwin-21"         # ضع معرف الشريك الخاص بك هنا
+LAST_DEAL_FILE = "last_deal.json"  # ملف لحفظ آخر منتج تم إرساله لمنع التكرار
 
-# ========== 30 عبارة تسويقية جذابة ==========
+# ========== قائمة العبارات التسويقية الجذابة ==========
 MARKETING_PHRASES = [
     "🔥 عرض لمدة 24 ساعة فقط",
     "⚡ خصم يصل إلى 50%",
@@ -18,39 +18,17 @@ MARKETING_PHRASES = [
     "🚀 الشحن المجاني اليوم فقط",
     "💎 الأكثر مبيعاً في أمازون",
     "🏆 أفضل سعر خلال 30 يوماً",
-    "✨ إدخال رائع للمنزل",
-    "💥 كمية محدودة - لا تفوتك",
-    "📦 وصول سريع خلال 24 ساعة",
-    "🛒 أضف إلى السلة الآن",
-    "⭐ تقييم 4.5 نجوم فما فوق",
-    "🎯 صفقة اليوم الحصرية",
-    "🔋 شحن مجاني لجميع المدن",
-    "💰 استرداد الضريبة متاح",
-    "📉 سعر منخفض قياسي",
-    "🏅 موصى به من قبل الخبراء",
-    "🎉 أقوى عروض الصيف",
-    "💪 جودة عالية بثمن منخفض",
-    "🎁 هدية مجانية مع كل طلب",
-    "⏳ يتبقى فقط 5 قطع",
-    "🏠 مناسب لكل العائلة",
-    "📱 متوافق مع أحدث الإصدارات",
-    "🔒 شراء آمن 100%",
-    "👨‍👩‍👧‍👦 هدية مثالية للأحباب",
-    "🏷️ كود خصم إضافي عند الدفع",
-    "🌟 منتج حاصل على جائزة",
-    "🎯 العرض لمشاهدي القناة فقط",
-    "🔄 إرجاع مجاني خلال 30 يوماً",
-    "🏆 اختيار المحررين",
-    "🎁 عرض خاص بمناسبة التخفيضات"
+    # ... يمكنك إضافة المزيد هنا
 ]
 
-# ========== إضافة عبارة تسويقية عشوائية ==========
 def add_marketing_phrase(title):
+    """تضيف عبارة تسويقية عشوائية قبل عنوان المنتج"""
     phrase = random.choice(MARKETING_PHRASES)
     return f"{phrase}\n\n{title}"
 
-# ========== حفظ آخر منتج تم إرساله ==========
+# ========== دوال منع التكرار ==========
 def save_last_deal(deal):
+    """حفظ بيانات آخر منتج تم إرساله"""
     try:
         with open(LAST_DEAL_FILE, "w", encoding="utf-8") as f:
             json.dump(deal, f, ensure_ascii=False, indent=2)
@@ -58,8 +36,8 @@ def save_last_deal(deal):
     except Exception as e:
         print(f"⚠️ خطأ أثناء حفظ آخر منتج: {e}")
 
-# ========== قراءة آخر منتج تم إرساله ==========
 def get_last_deal():
+    """قراءة آخر منتج تم إرساله من الملف"""
     try:
         with open(LAST_DEAL_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -70,37 +48,53 @@ def get_last_deal():
         print(f"⚠️ خطأ أثناء قراءة آخر منتج: {e}")
         return None
 
-# ========== جلب العروض من أمازون (أفضل مبيعاً) ==========
+def select_unique_deal(deals, last_deal):
+    """تختار منتجاً مختلفاً عن آخر منتج تم إرساله"""
+    if not deals:
+        return None
+    if last_deal is None:
+        return random.choice(deals)
+    unique_deals = [d for d in deals if d["link"] != last_deal.get("link")]
+    if not unique_deals:
+        print("⚠️ جميع المنتجات الحالية مكررة. سيتم إرسال المنتج الأول.")
+        return deals[0]
+    return random.choice(unique_deals)
+
+# ========== دالة جلب المنتجات من صفحة عروض أمازون ==========
 def fetch_amazon_deals():
-    url = "https://www.amazon.sa/gp/bestsellers"
+    """تجلب قائمة بأحدث العروض من صفحة العروض (Today's Deals) في أمازون السعودية"""
+    print("🔄 جاري جلب العروض من أمازون...")
+    deals_url = "https://www.amazon.sa/deals"  # صفحة العروض الرئيسية
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
-    
+
     try:
-        response = requests.get(url, headers=headers, timeout=15)
+        response = requests.get(deals_url, headers=headers, timeout=15)
         response.raise_for_status()
     except Exception as e:
-        print(f"❌ فشل الاتصال بأمازون: {e}")
+        print(f"❌ فشل الاتصال بصفحة العروض: {e}")
         return []
-    
+
     soup = BeautifulSoup(response.text, "lxml")
-    product_items = soup.select("div.p13n-sc-truncate-desktop-type2")
+    
+    # البحث عن عناصر المنتجات داخل الصفحة (مع التحديث لأحدث بنية)
+    # نستخدم محدداً بحثاً يجد العناوين داخل روابط المنتجات
+    product_items = soup.select("div[data-testid='product-card'] a.a-link-normal[href*='/dp/']")
     
     if not product_items:
         print("⚠️ لم يتم العثور على منتجات. ربما تغيرت بنية الصفحة.")
+        # إذا تغيرت الصفحة، نستخدم عروض احتياطية كحل بديل
         return []
     
     deals = []
-    for item in product_items[:10]:  # نأخذ أول 10 منتجات
-        title = item.get_text(strip=True)
-        parent_link = item.find_parent("a")
-        if parent_link and parent_link.get("href"):
-            link = parent_link["href"]
-            if not link.startswith("http"):
-                link = "https://www.amazon.sa" + link
-        else:
-            continue
+    for item in product_items[:10]:  # نأخذ أول 10 منتجات فقط
+        link = item.get('href')
+        if not link.startswith("http"):
+            link = "https://www.amazon.sa" + link
+        
+        title_element = item.find('span', recursive=False)
+        title = title_element.get_text(strip=True) if title_element else "منتج مميز"
         
         deals.append({
             "title": title,
@@ -109,27 +103,12 @@ def fetch_amazon_deals():
     
     return deals
 
-# ========== اختيار منتج مختلف عن آخر منتج ==========
-def select_unique_deal(deals, last_deal):
-    if not deals:
-        return None
-    
-    if last_deal is None:
-        return random.choice(deals)
-    
-    unique_deals = [d for d in deals if d["link"] != last_deal.get("link")]
-    
-    if not unique_deals:
-        print("⚠️ جميع المنتجات الحالية مكررة لآخر منتج. سيتم إرسال المنتج الأول مع تجاهل التكرار.")
-        return deals[0]
-    
-    return random.choice(unique_deals)
-
-# ========== الإرسال إلى تيليجرام (بدون تقصير) ==========
+# ========== دالة بناء وإرسال الرسالة ==========
 def post_to_telegram():
-    print("🔄 جاري جلب العروض من أمازون...")
+    """الوظيفة الرئيسية: جلب المنتجات، اختيار واحد عشوائي، وإرساله مع عبارة تسويقية"""
     deals = fetch_amazon_deals()
     
+    # استخدام قائمة احتياطية في حالة فشل جلب العروض
     if not deals:
         print("❌ لا توجد عروض متاحة. سيتم استخدام العروض الاحتياطية.")
         deals = [
@@ -144,16 +123,18 @@ def post_to_telegram():
         print("❌ لا يمكن اختيار منتج. الخروج.")
         return
     
-    # الرابط الطويل مع إضافة كود الأرباح (بدون أي تقصير)
+    # إضافة كود الأرباح للرابط
     final_link = f"{deal['link']}?tag={ASSOCIATE_TAG}"
     
-    # إضافة عبارة تسويقية للعنوان
+    # إضافة العبارة التسويقية للعنوان
     title_with_phrase = add_marketing_phrase(deal['title'])
     
-    # نص الرسالة - الرابط يظهر كاملاً كما هو
+    # بناء نص الرسالة مع التنبيه إلى أن العرض من صفحة العروض
     message_text = (
         f"<b>{title_with_phrase}</b>\n\n"
-        f"🔗 <b>رابط الشراء المباشر:</b>\n{final_link}"
+        f"<i>✨ هذا العرض مُستورد من صفحة عروض أمازون الحصرية ✨</i>\n\n"
+        f"🔗 <b>رابط الشراء المباشر:</b>\n{final_link}\n\n"
+        f"💡 <i>تذكر: العروض لفترة محدودة، فلا تتردد!</i>"
     )
     
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -161,13 +142,13 @@ def post_to_telegram():
         "chat_id": TELEGRAM_CHAT_ID,
         "text": message_text,
         "parse_mode": "HTML",
-        "disable_web_page_preview": False  # يظهر معاينة للمنتج
+        "disable_web_page_preview": False
     }
     
     try:
         response = requests.post(url, json=payload)
         if response.status_code == 200:
-            print("✅ تم الإرسال بنجاح مع الرابط الأصلي (بدون تقصير)!")
+            print("✅ تم الإرسال بنجاح مع عرض من صفحة العروض!")
             save_last_deal(deal)
         else:
             print(f"❌ فشل الإرسال: {response.text}")
