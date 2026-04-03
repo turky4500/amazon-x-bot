@@ -7,7 +7,6 @@ import time
 import logging
 from datetime import datetime
 from bs4 import BeautifulSoup
-from dateutil import parser
 
 # ========== الإعدادات الأساسية ==========
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -15,8 +14,7 @@ TELEGRAM_CHAT_ID = "@amazonturky"
 ASSOCIATE_TAG = "tkwin-21"
 LAST_DEAL_FILE = "last_deal.json"
 # ========== تحديد مصدر العروض ==========
-# القيم المتاحة: "bestsellers" , "todays_deals", "prime_deals"
-SOURCE = "bestsellers"  # غير هذه القيمة لتبديل المصدر
+SOURCE = "bestsellers"  # غيّر إلى "todays_deals" أو "prime_deals" حسب الرغبة
 
 # ========== 30 عبارة تسويقية ==========
 MARKETING_PHRASES = [
@@ -52,7 +50,6 @@ MARKETING_PHRASES = [
     "🎁 عرض خاص بمناسبة التخفيضات"
 ]
 
-# ========== دوال مساعدة ==========
 def add_marketing_phrase(title):
     phrase = random.choice(MARKETING_PHRASES)
     return f"{phrase}\n\n{title}"
@@ -75,7 +72,6 @@ def get_last_deal():
 def is_valid_amazon_link(link):
     return bool(re.search(r'/dp/([A-Z0-9]{10})', link))
 
-# ========== مصادر جلب العروض ==========
 def fetch_bestsellers():
     url = "https://www.amazon.sa/gp/bestsellers"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -84,7 +80,7 @@ def fetch_bestsellers():
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
     except Exception as e:
-        print(f"❌ فشل الاتصال بصفحة الأكثر مبيعاً: {e}")
+        print(f"❌ فشل الاتصال: {e}")
         return []
     soup = BeautifulSoup(response.text, "lxml")
     products = []
@@ -99,7 +95,7 @@ def fetch_bestsellers():
                 products.append({"title": title, "link": link})
         if len(products) >= 10:
             break
-    print(f"✅ تم استخراج {len(products)} منتجاً من الأكثر مبيعاً.")
+    print(f"✅ تم استخراج {len(products)} منتجاً.")
     return products
 
 def fetch_todays_deals():
@@ -110,7 +106,7 @@ def fetch_todays_deals():
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
     except Exception as e:
-        print(f"❌ فشل الاتصال بصفحة عروض اليوم: {e}")
+        print(f"❌ فشل الاتصال: {e}")
         return []
     soup = BeautifulSoup(response.text, "lxml")
     products = []
@@ -126,7 +122,7 @@ def fetch_todays_deals():
                 products.append({"title": title, "link": link})
         if len(products) >= 10:
             break
-    print(f"✅ تم استخراج {len(products)} منتجاً من عروض اليوم.")
+    print(f"✅ تم استخراج {len(products)} منتجاً.")
     return products
 
 def fetch_prime_deals():
@@ -137,7 +133,7 @@ def fetch_prime_deals():
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
     except Exception as e:
-        print(f"❌ فشل الاتصال بصفحة عروض البرايم: {e}")
+        print(f"❌ فشل الاتصال: {e}")
         return []
     soup = BeautifulSoup(response.text, "lxml")
     products = []
@@ -153,16 +149,16 @@ def fetch_prime_deals():
                 products.append({"title": title, "link": link})
         if len(products) >= 10:
             break
-    print(f"✅ تم استخراج {len(products)} منتجاً من عروض البرايم.")
+    print(f"✅ تم استخراج {len(products)} منتجاً.")
     return products
 
 def fetch_deals():
-    source = SOURCE.lower()
-    if source == "bestsellers":
+    src = SOURCE.lower()
+    if src == "bestsellers":
         return fetch_bestsellers()
-    elif source == "todays_deals":
+    elif src == "todays_deals":
         return fetch_todays_deals()
-    elif source == "prime_deals":
+    elif src == "prime_deals":
         return fetch_prime_deals()
     else:
         print(f"⚠️ مصدر غير معروف: {SOURCE}. سيتم استخدام الأكثر مبيعاً.")
@@ -175,7 +171,6 @@ def select_unique_deal(deals, last_deal):
         return random.choice(deals)
     unique = [d for d in deals if d["link"] != last_deal.get("link")]
     if not unique:
-        print("⚠️ جميع المنتجات مكررة، سيتم إرسال أي منتج.")
         return deals[0]
     return random.choice(unique)
 
@@ -183,35 +178,31 @@ def post_to_telegram():
     print("🔄 بدء تشغيل البوت...")
     deals = fetch_deals()
     if not deals:
-        print("❌ لا توجد عروض متاحة. لن يتم إرسال أي شيء.")
+        print("❌ لا توجد عروض. لن يتم الإرسال.")
         return
-    last_deal = get_last_deal()
-    deal = select_unique_deal(deals, last_deal)
+    last = get_last_deal()
+    deal = select_unique_deal(deals, last)
     if not deal:
-        print("❌ لا يمكن اختيار منتج.")
         return
     final_link = f"{deal['link']}?tag={ASSOCIATE_TAG}"
     title_with_phrase = add_marketing_phrase(deal['title'])
-    message_text = (
-        f"<b>{title_with_phrase}</b>\n\n"
-        f"🔗 <b>رابط الشراء المباشر:</b>\n{final_link}"
-    )
+    msg = f"<b>{title_with_phrase}</b>\n\n🔗 <b>رابط الشراء المباشر:</b>\n{final_link}"
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
-        "text": message_text,
+        "text": msg,
         "parse_mode": "HTML",
         "disable_web_page_preview": False
     }
     try:
-        response = requests.post(url, json=payload, timeout=10)
-        if response.status_code == 200:
-            print("✅ تم إرسال العرض بنجاح!")
+        r = requests.post(url, json=payload, timeout=10)
+        if r.status_code == 200:
+            print("✅ تم الإرسال بنجاح!")
             save_last_deal(deal)
         else:
-            print(f"❌ فشل الإرسال: {response.text}")
+            print(f"❌ فشل الإرسال: {r.text}")
     except Exception as e:
-        print(f"⚠️ خطأ في الإرسال: {e}")
+        print(f"⚠️ خطأ: {e}")
 
 if __name__ == "__main__":
     post_to_telegram()
