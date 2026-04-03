@@ -125,11 +125,10 @@ def post_to_telegram():
     # إضافة كود الأرباح
     final_link = f"{deal['link']}?tag={ASSOCIATE_TAG}"
     
-    # نص الرسالة
+    # نص الرسالة (تم حذف جملة "تم الرصد بواسطة بوت تركي")
     message_text = (
         f"<b>{deal['title']}</b>\n\n"
-        f"🔗 <b>رابط الشراء المباشر:</b>\n{final_link}\n\n"
-        f"✅ <b>تم الرصد بواسطة بوت صيدات تركي</b>"
+        f"🔗 <b>رابط الشراء المباشر:</b>\n{final_link}"
     )
     
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -143,7 +142,7 @@ def post_to_telegram():
     try:
         response = requests.post(url, json=payload)
         if response.status_code == 200:
-            print("✅ تم الإرسال بنجاح مع عروض حقيقية!")
+            print("✅ تم الإرسال بنجاح!")
             # بعد الإرسال الناجح، نقوم بحفظ هذا المنتج كآخر منتج
             save_last_deal(deal)
         else:
