@@ -3,7 +3,6 @@ import os
 import random
 import json
 from bs4 import BeautifulSoup
-import pyshorteners
 
 # ========== الإعدادات الأساسية ==========
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -11,15 +10,20 @@ TELEGRAM_CHAT_ID = "@amazonturky"
 ASSOCIATE_TAG = "tkwin-21"
 LAST_DEAL_FILE = "last_deal.json"
 
-# ========== دالة تقصير الرابط ==========
+# ========== دالة تقصير الرابط باستخدام TinyURL API (بدون مكتبات إضافية) ==========
 def shorten_url(long_url):
+    """تقصير الرابط عبر خدمة TinyURL - تعيد الرابط المختصر أو الأصلي في حالة الفشل"""
     try:
-        s = pyshorteners.Shortener()
-        short_url = s.tinyurl.short(long_url)
-        print(f"🔗 تم تقصير الرابط بنجاح: {short_url}")
-        return short_url
+        api_url = f"https://tinyurl.com/api-create.php?url={long_url}"
+        response = requests.get(api_url, timeout=10)
+        if response.status_code == 200 and response.text.startswith("https://tinyurl.com/"):
+            print(f"🔗 تم تقصير الرابط بنجاح: {response.text}")
+            return response.text
+        else:
+            print(f"⚠️ فشل تقصير الرابط (الرمز {response.status_code})، سيتم إرسال الرابط الطويل.")
+            return long_url
     except Exception as e:
-        print(f"⚠️ فشل تقصير الرابط، سيتم إرسال الرابط الطويل: {e}")
+        print(f"⚠️ خطأ أثناء تقصير الرابط: {e}")
         return long_url
 
 # ========== دالة حفظ آخر منتج تم إرساله ==========
@@ -123,6 +127,7 @@ def post_to_telegram():
     # تقصير الرابط
     short_link = shorten_url(final_link)
     
+    # نص الرسالة (بدون جملة البوت)
     message_text = (
         f"<b>{deal['title']}</b>\n\n"
         f"🔗 <b>رابط الشراء المباشر:</b>\n{short_link}"
